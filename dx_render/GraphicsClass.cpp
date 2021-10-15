@@ -24,6 +24,7 @@ GraphicsClass::~GraphicsClass()
 bool GraphicsClass::Initialize(int screenWidth, int screenHeight, HWND hwnd)
 {
 	bool result;
+	const char* modelFileName = "../cube.obj";
 
 
 	// Create the Direct3D object.
@@ -59,7 +60,7 @@ bool GraphicsClass::Initialize(int screenWidth, int screenHeight, HWND hwnd)
 
 	// Initialize the model object.
 	// result = m_Model->Initialize(m_D3D->GetDevice());
-	result = m_Model->Initialize(m_D3D->GetDevice(), L"../happy.dds");
+	result = m_Model->Initialize(m_D3D->GetDevice(), modelFileName, L"../happy.dds");
 	if (!result)
 	{
 		MessageBox(hwnd, L"Could not initialize the model object.", L"Error", MB_OK);
@@ -160,7 +161,7 @@ bool GraphicsClass::Render()
 
 
 	// Clear the buffers to begin the scene.
-	m_D3D->BeginScene(0.0f, 0.0f, 0.0f, 1.0f);
+	m_D3D->BeginScene(0.0f, 0.2f, 0.0f, 1.0f);
 
 	// Generate the view matrix based on the camera's position.
 	m_Camera->Render();

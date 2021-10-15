@@ -22,13 +22,20 @@ ModelClass::~ModelClass()
 }
 
 // The Initialize function will call the initialization functions for the vertex and index buffers.
-bool ModelClass::Initialize(ID3D11Device * device, const wchar_t* textureFilename)
+bool ModelClass::Initialize(ID3D11Device * device, const char* modelFileName, const wchar_t* textureFilename)
 {
 	bool result;
-
+	std::vector<VertexType> obj_verts;
+	std::vector<unsigned long> obj_indices;
+	result = LoadOBJ(modelFileName, obj_verts, obj_indices);
+	if (!result)
+	{
+		return false;
+	}
 
 	// Initialize the vertex and index buffer that hold the geometry for the triangle.
-	result = InitializeBuffers(device);
+	// result = InitializeBuffers(device);
+	result = InitializeOBJBuffers(device,obj_verts,obj_indices);
 	if (!result)
 	{
 		return false;
@@ -199,6 +206,77 @@ bool ModelClass::InitializeBuffers(ID3D11Device * device)
 	return true;
 }
 
+bool ModelClass::InitializeOBJBuffers(ID3D11Device* device, std::vector<VertexType>& obj_verts, std::vector<unsigned long>& obj_indices)
+{
+	VertexType* vertices;
+	unsigned long* indices;
+	D3D11_BUFFER_DESC vertexBufferDesc, indexBufferDesc;
+	D3D11_SUBRESOURCE_DATA vertexData, indexData;
+	HRESULT result;
+
+	// First create two temporary arrays to hold the vertex and index data that we will use later to populate the final buffers with.
+
+	// Set the number of vertices in the vertex array.
+	m_vertexCount = obj_verts.size();
+
+	// Set the number of indices in the index array.
+	m_indexCount = obj_indices.size();
+
+
+	// With the vertex array and index array filled out we can now use those to create the vertex buffer and index buffer.
+	// Creating both buffers is done in the same fashion.
+	// First, fill out a description of the buffer.
+	// In the description the ByteWidth(size of the buffer) and the BindFlags(type of buffer) are what you need to ensure are filled out correctly.
+	// After the description is filled out you need to also fill out a subresource pointer which will point to either your vertex or index array you previously created.
+	// With the description and subresource pointer you can call CreateBuffer using the D3D device and it will return a pointer to your new buffer.
+
+	// Set up the description of the static vertex buffer.
+	vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+	vertexBufferDesc.ByteWidth = sizeof(VertexType) * m_vertexCount;
+	vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	vertexBufferDesc.CPUAccessFlags = 0;
+	vertexBufferDesc.MiscFlags = 0;
+	vertexBufferDesc.StructureByteStride = 0;
+
+	// Give the subresource structure a pointer to the vertex data.
+	vertexData.pSysMem = obj_verts.data();
+	vertexData.SysMemPitch = 0;
+	vertexData.SysMemSlicePitch = 0;
+
+	// Now create the vertex buffer.
+	result = device->CreateBuffer(&vertexBufferDesc, &vertexData, &m_vertexBuffer);
+	if (FAILED(result))
+	{
+		return false;
+	}
+
+	// Set up the description of the static index buffer.
+	indexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+	indexBufferDesc.ByteWidth = sizeof(unsigned long) * m_indexCount;
+	indexBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+	indexBufferDesc.CPUAccessFlags = 0;
+	indexBufferDesc.MiscFlags = 0;
+	indexBufferDesc.StructureByteStride = 0;
+
+	// Give the subresource structure a pointer to the index data.
+	indexData.pSysMem = obj_indices.data();
+	indexData.SysMemPitch = 0;
+	indexData.SysMemSlicePitch = 0;
+
+	// Create the index buffer.
+	result = device->CreateBuffer(&indexBufferDesc, &indexData, &m_indexBuffer);
+	if (FAILED(result))
+	{
+		return false;
+	}
+	// After the vertex and index buffers have been created, you can delete the vertex and index arrays as they are no longer needed, since the data was copied into the buffers.
+
+	// Release the arrays now that the vertex and index buffers have been created and loaded.
+	// Not sure if this is needed
+
+	return true;
+}
+
 bool ModelClass::LoadTexture(ID3D11Device* device, const wchar_t* filename)
 {
 	bool result;
@@ -232,6 +310,81 @@ void ModelClass::ReleaseTexture()
 	}
 
 	return;
+}
+
+bool ModelClass::LoadOBJ(const char* filename, OUT std::vector<VertexType>& out_verts, OUT std::vector<unsigned long>& obj_indices)
+{
+	FILE* f = nullptr;
+	bool res = fopen_s(&f, filename, "r");
+	std::vector< unsigned int > vertexIndices, uvIndices, normalIndices;
+	std::vector<XMFLOAT3> verts;
+	std::vector<XMFLOAT2> uvs;
+	std::vector<XMFLOAT3> norms;
+	if (res == 0) {
+		printf("The file %s was opened\n",filename);
+	}
+	else {
+		printf("File opening failed for %s\n", filename);
+		return false;
+	}
+	fseek(f, 0L, SEEK_SET);
+	while (1) {
+
+		char lineHeader[128];
+		// read the first word of the line
+		int res = fscanf_s(f, "%s", lineHeader, 128);
+		if (res == EOF)
+			break; // EOF = End Of File. Quit the loop.
+		if (strcmp(lineHeader, "v") == 0) {
+			XMFLOAT3 vertex;
+			fscanf_s(f, "%f %f %f\n", &vertex.x, &vertex.y, &vertex.z);
+			verts.push_back(vertex);
+		}
+		else if (strcmp(lineHeader, "vt") == 0) {
+			XMFLOAT2 uv;
+			fscanf_s(f, "%f %f\n", &uv.x, &uv.y);
+			uvs.push_back(uv);
+		}
+		else if (strcmp(lineHeader, "vn") == 0) {
+			XMFLOAT3 normal;
+			fscanf_s(f, "%f %f %f\n", &normal.x, &normal.y, &normal.z);
+			norms.push_back(normal);
+		}
+		else if (strcmp(lineHeader, "f") == 0) {
+			std::string vertex1, vertex2, vertex3;
+			unsigned int vertexIndex[3], uvIndex[3], normalIndex[3];
+			int matches = fscanf_s(f, "%d/%d/%d %d/%d/%d %d/%d/%d\n", &vertexIndex[0], &uvIndex[0], &normalIndex[0], &vertexIndex[1], &uvIndex[1], &normalIndex[1], &vertexIndex[2], &uvIndex[2], &normalIndex[2]);
+			if (matches != 9) {
+				printf("File can't be read by our simple parser : ( Try exporting with other options\n");
+				return false;
+			}
+			vertexIndices.push_back(vertexIndex[0]);
+			vertexIndices.push_back(vertexIndex[1]);
+			vertexIndices.push_back(vertexIndex[2]);
+			uvIndices.push_back(uvIndex[0]);
+			uvIndices.push_back(uvIndex[1]);
+			uvIndices.push_back(uvIndex[2]);
+			normalIndices.push_back(normalIndex[0]);
+			normalIndices.push_back(normalIndex[1]);
+			normalIndices.push_back(normalIndex[2]);
+		}
+	}
+	for (unsigned int i = 0; i < vertexIndices.size(); i++) {
+		VertexType v;
+		v.position = verts[vertexIndices[i]-1];
+		v.texture = uvs[uvIndices[i]-1];
+		v.normal = norms[normalIndices[i]-1];
+		out_verts.push_back(v);
+	}
+	// [NOTE] This could be unnecessary/redundant, we could probably grab them from above - need to see how DX11 handles this sort of thing
+	for (unsigned int i = 0; i < vertexIndices.size(); i++) {
+		unsigned long vInd;
+		//vInd = vertexIndices[i];
+		vInd = unsigned long(i);
+		obj_indices.push_back(vInd);
+	}
+
+	return true;
 }
 
 // The ShutdownBuffers function just releases the vertex and index buffers that were created in the InitializeBuffers function.

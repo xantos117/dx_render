@@ -38,6 +38,7 @@ private:
 	{
 		XMFLOAT3 position;
 		XMFLOAT2 texture;
+		XMFLOAT3 normal;
 	};
 
 public:
@@ -48,7 +49,7 @@ public:
 	// The functions here handle initializing and shutdown of the model's vertex and index buffers.
 	// The Render function puts the model geometry on the video card to prepare it for drawing by the color shader.
 
-	bool Initialize(ID3D11Device*, const wchar_t* textureFilename);
+	bool Initialize(ID3D11Device*, const char* modelFileName, const wchar_t* textureFilename);
 	void Shutdown();
 	void Render(ID3D11DeviceContext*);
 
@@ -58,11 +59,13 @@ public:
 
 private:
 	bool InitializeBuffers(ID3D11Device*);
+	bool InitializeOBJBuffers(ID3D11Device*,std::vector<VertexType> & obj_verts,std::vector<unsigned long>& obj_indices);
 	void ShutdownBuffers();
 	void RenderBuffers(ID3D11DeviceContext*);
 
 	bool LoadTexture(ID3D11Device*, const wchar_t*);
 	void ReleaseTexture();
+	bool LoadOBJ(const char* filename,OUT std::vector<VertexType> & out_verts, OUT std::vector<unsigned long>& out_indices);
 	
 	// The private variables in the ModelClass are the vertex and index buffer as well as two integers to keep track of the size of each buffer.
 	// Note that all DirectX 11 buffers generally use the generic ID3D11Buffer type and are more clearly identified by a buffer description when they are first created.
